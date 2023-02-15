@@ -1,0 +1,77 @@
+与catalina.sh相关的脚本
+tomcat发布版本中附带了很多脚本，和catalina.sh相关有如下
+    version.sh，查看当前tomcat的版本号。
+    startup.sh，启动运行tomcat实例。
+    shutdown.sh，停止tomcat实例的运行。
+    configtest.sh，校验tomcat配置文件server.xml的格式、内容等是否合法、正确。
+    setclasspath.sh，catalina.sh依赖这个脚本来设置一些运行时变量。
+    脚本version.sh、startup.sh、shutdown.sh、configtest.sh都是对catalina.sh的包装，内容大同小异，差异在于功能介绍和调用catalina.sh时的参数不同。
+    下面就重点分析下catalina.sh的实现。
+
+catalina.sh的命令行选项
+在shell下不带任何参数来执行catalina.sh，可以看到类似如下的输出信息。
+
+Usage: catalina ( commands ... )
+commands:
+debug Start Catalina in a debugger
+debug -security Debug Catalina with a security manager
+jpda start Start Catalina under JPDA debugger
+run Start Catalina in the current window
+run -security Start in the current window with security manager
+start Start Catalina in a separate window
+start -security Start in a separate window with security manager
+stop Stop Catalina
+configtest Run a basic syntax check on server.xml
+version What version of tomcat are you running?
+
+帮助信息给出了各选项的意义，但tomcat提供的封装脚本中只用到了其中的一部分，比如：
+    version，在version.sh中使用。
+    start，在startup.sh中使用。
+    stop，在shutdown.sh中使用。
+    configtest，在configtest.sh中使用。
+如果需要使用其它命令行选项，最简单的方法即是复制startup.sh脚本并重命名为新的脚本，使用文本编辑器调整传给catalina.sh的参数，如此操作之后，满足自定义需求的脚本即创建好了。
+
+catalina.sh中使用的变量
+catalina.sh提供了哪些变量？
+用文本编辑器打开catalina.sh，首先可以看到一些环境变量的说明，基于功能可以做如下分类：
+(1)指定tomcat和应用的启动路径
+    CATALINA_HOME，指向tomcat的安装路径，或者脚本catalina.sh所在位置的父目录。
+    CATALINA_BASE，可选项，如无定义，则与CATALINA_HOME取值相同。用于指向用户自定义的tomcat路径，tomcat启动时将以CATALINA_BASE变量值来计算配置文件、日志文件等的路径。
+(2)Java运行时路径，tomcat运行依赖系统已安装好的Java运行时软件，因此如下两个变量中至少定义一个，并且变量值指向合法路径。
+    JAVA_HOME，指定JDK的安装路径。
+    JRE_HOME，指定JRE的安装路径。取值原则，如用户未指定JRE_HOME，则取JAVA_HOME的值；如JRE_HOME和JAVA_HOME都有定义，则优先取JRE_HOME的定义。
+    Java运行时参数
+    JAVA_OPTS，顾名思义，用来定义传递Java运行时的参数，对全部命令行选项都会生效，因此不建议在本变量中定义堆大小、GC参数、JMX参数等。
+    CATALINA_OPTS，用来定义传递给Java运行时的参数，仅在命令行选项为run/start/debug时有效，可以用来传递堆大小、GC参数、JMX参数等。
+    CATALINA_TMPDIR，用来定义java.io.tmpdir变量的值，默认值为$CATALINA_BASE/temp。
+    JAVA_ENDORSED_DIRS，以分号相隔的目录列表，用来替换非JCP提供的jar实现，默认值为$CATALINA_HOME/endorsed。
+(3)远程调试参数。当开发环境与应用运行环境不一致，或者开发环境下出于各种原因不适合调试应用时，这时即可借助远程调试来解决问题。JPDA的介绍可参考阅读资料。
+    JPDA_TRANSPORT，默认值dt_socket。
+    JPDA_ADDRESS，默认值localhost:8000。
+    JPDA_SUSPEND，默认值n
+    JPDA_OPTS，默认值为-agentlib:jdwp=transport=$JPDA_TRANSPORT,address=$JPDA_ADDRESS,server=y,suspend=$JPDA_SUSPEND
+(4)其它
+    CATALINA_OUT，使用全路径方式指定stdout和stderr重定向之后的文件名，默认值为$CATALINA_BASE/logs/catalina.out。
+    CATALINA_PID，本选项在*nix下有效，指定pid文件的存储路径，默认值为空，如用户指定，则启动、停止时都会从变量指定的文件中提取进程ID。
+    LOGGING_CONFIG，定义tomcat使用的日志配置文件的路径，默认值为$CATALINA_BASE/conf/logging.properties。
+    LOGGING_MANAGER，定义tomcat使用的日志管理器。
+看过变量的定义之后，是否有定制变量取值的冲动了？
+
+如何定义catalina.sh提供的变量？
+    方法一，修改catalina.sh，在脚本的开始位置为前述变量赋值。
+    方法二，提供自定义的启动、停止脚本，在自定义的脚本中为前述变量赋值。
+    方法三，使用tomcat开发人员预留的扩展方法，在$CATALINA_BASE/bin/setenv.sh中为前述变量赋值。
+个人推荐方法二，升级tomcat版本时非常简单，不需要从原tomcat安装路径下复制文件到升级后的tomcat的安装路径下。
+
+catalina.sh的实现
+catalina.sh规格接近600行代码，这足以吓退很多人，但如果肯硬着头皮看几遍的话，其实可以了解到catalina.sh的代码并不复杂，可读性还是很高的。
+除去catalina.sh中对cygwin、os400的特殊处理，代码做了如下操作：
+    加载类路径，通过加载、执行setclasspath.sh实现。
+    加载用户自定义变量，通过加载setenv.sh实现。
+    校验变量，包括前述介绍的变量，检查是否存在定义，如无定义则使用默认值，并依据用途做相应的校验。
+    运行命令，依据脚本接收到的选项，将变量拼接为命令，并执行。
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------
