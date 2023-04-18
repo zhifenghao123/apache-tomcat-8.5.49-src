@@ -4905,6 +4905,11 @@ public class StandardContext extends ContainerBase
      * Start this component and implement the requirements
      * of {@link org.apache.catalina.util.LifecycleBase#startInternal()}.
      *
+     * added by haozhifeng:
+     * （1）发布了一个CONFIGURE_START_EVENT事件，就是触发web.xml解析的地方。
+     * （2）然后之后设置了实例管理器为 DefaultInstanceManager（这个类在后面谈实例构造时会用到）。
+     * （3）再后面调用了listenerStart ，filterStart ，loadOnStartup 方法，这里即触发 Listener、Filter、Servlet 真正对象的构造。
+     *
      * @exception LifecycleException if this component detects a fatal error
      *  that prevents this component from being used
      */
@@ -5060,6 +5065,7 @@ public class StandardContext extends ContainerBase
                 }
 
                 // Notify our interested LifecycleListeners
+                // ************  发布事件，这里会触发web.xml的解析   ***************
                 fireLifecycleEvent(Lifecycle.CONFIGURE_START_EVENT, null);
 
                 // Start our child containers, if not already started
@@ -5130,6 +5136,7 @@ public class StandardContext extends ContainerBase
                     }
                     Map<String, Map<String, String>> injectionMap = buildInjectionMap(
                             getIgnoreAnnotations() ? new NamingResourcesImpl(): getNamingResources());
+                    //**********设置实例管理器为 DefaultInstanceManager **********
                     setInstanceManager(new DefaultInstanceManager(context,
                             injectionMap, this, this.getClass().getClassLoader()));
                 }
@@ -5145,6 +5152,7 @@ public class StandardContext extends ContainerBase
             }
 
             // Set up the context init params
+            // 设置初始化参数
             mergeParameters();
 
             // Call ServletContainerInitializers
@@ -5162,6 +5170,7 @@ public class StandardContext extends ContainerBase
 
             // Configure and call application event listeners
             if (ok) {
+                //*******就是这里配置调用Listener*******
                 if (!listenerStart()) {
                     log.error(sm.getString("standardContext.listenerFail"));
                     ok = false;
@@ -5188,6 +5197,7 @@ public class StandardContext extends ContainerBase
 
             // Configure and call application filters
             if (ok) {
+                //*******就是这里配置调用Filter*******
                 if (!filterStart()) {
                     log.error(sm.getString("standardContext.filterFail"));
                     ok = false;
@@ -5196,6 +5206,7 @@ public class StandardContext extends ContainerBase
 
             // Load and initialize all "load on startup" servlets
             if (ok) {
+                //*******就是这里配置调用Servlet *******
                 if (!loadOnStartup(findChildren())){
                     log.error(sm.getString("standardContext.servletFail"));
                     ok = false;
