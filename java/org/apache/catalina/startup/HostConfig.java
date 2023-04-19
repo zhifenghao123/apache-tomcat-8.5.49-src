@@ -414,6 +414,10 @@ public class HostConfig implements LifecycleListener {
     /**
      * Deploy applications for any directories or WAR files that are found
      * in our "application root" directory.
+     *
+     * added by haozhifeng:
+     * 部署应用,该方法被org.apache.catalina.startup.HostConfig.start()调用
+     * 包含3种部署方式，每个部署方式分别使用内部类，分配一个线程处理
      */
     protected void deployApps() {
 
